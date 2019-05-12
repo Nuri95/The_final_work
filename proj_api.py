@@ -9,7 +9,7 @@ def make_request(**params):
     params = {key: value for key, value in params.items() if value is not None}
     try:
         response = requests.get('https://newsapi.org/v2/top-headlines', params=params)
-        pprint.pprint('responseJSON= ', response.json())
+#        pprint.pprint('responseJSON= ', response.json())
 
         for article in response.json()['articles']:
 
@@ -20,6 +20,8 @@ def make_request(**params):
         print(str(c))
     except ValueError as v:
         print(str(v))
+    except AttributeError as a:
+        print(str(a))
 
 
 @click.command()
