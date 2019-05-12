@@ -1,5 +1,6 @@
 import pprint
 import sys
+import json
 
 import requests
 import click
@@ -7,21 +8,20 @@ import click
 
 def make_request(**params):
     params = {key: value for key, value in params.items() if value is not None}
+
+    response = requests.get('https://newsapi.org/v2/top-headlines', params=params)
     try:
-        response = requests.get('https://newsapi.org/v2/top-headlines', params=params)
-#        pprint.pprint('responseJSON= ', response.json())
-
+        response_json = response.json()
+    except response_json.decoder.JSONDecodeError:
+        print('error - api failed to return json')
+        return
+    if response_json['status'] == 'error':
+        print(response_json['message'])
+    else:
         for article in response.json()['articles']:
-
             print('title: ', article['title'])
             print('publishedAt: ', article['publishedAt'])
             print('url: ', article['url'])
-    except ConnectionError as c:
-        print(str(c))
-    except ValueError as v:
-        print(str(v))
-    except AttributeError as a:
-        print(str(a))
 
 
 @click.command()
