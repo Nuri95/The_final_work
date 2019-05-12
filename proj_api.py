@@ -7,13 +7,19 @@ import click
 
 def make_request(**params):
     params = {key: value for key, value in params.items() if value is not None}
-    response = requests.get('https://newsapi.org/v2/top-headlines', params=params)
+    try:
+        response = requests.get('https://newsapi.org/v2/top-headlines', params=params)
+        pprint.pprint('responseJSON= ', response.json())
 
-    #pprint.pprint(response.json())
+        for article in response.json()['articles']:
 
-    for article in response.json()['articles']:
-
-        print(article['title'])
+            print('title: ', article['title'])
+            print('publishedAt: ', article['publishedAt'])
+            print('url: ', article['url'])
+    except ConnectionError as c:
+        print(str(c))
+    except ValueError as v:
+        print(str(v))
 
 
 @click.command()
@@ -33,8 +39,12 @@ def make_request(**params):
               '-k',
               help='Keywords or a phrase to search for. ')
 def main(pagesize, page, category, country, keyword):
-    key = open('apiKey.txt', 'r').read()
-
+    try:
+        with open('apiKey.txt', 'r') as fobj:
+            key = fobj.read()
+    except OSError:
+        print('Ошибки с файлом')
+        exit()
     make_request(category=category,
                  q=keyword,
                  country=country,
