@@ -8,8 +8,14 @@ import click
 
 def make_request(**params):
     params = {key: value for key, value in params.items() if value is not None}
-
-    response = requests.get('https://newsapi.org/v2/top-headlines', params=params)
+    try:
+        response = requests.get('https://newsapi.org/v2/top-headlines', params=params)
+    except requests.ConnectionError as c:
+        print('No Internet connection')
+        exit()
+    except TimeoutError as t:
+        print('The waiting time is over.')
+        exit()
     try:
         response_json = response.json()
     except response_json.decoder.JSONDecodeError:
@@ -27,19 +33,24 @@ def make_request(**params):
 @click.command()
 @click.option('--pagesize',
               '-ps',
-              help='The number of results to return per page.')
+              help='The number of results to return per page.'
+              )
 @click.option('--page',
               '-p',
-              help='Page number')
+              help='Page number'
+              )
 @click.option('--category',
               '-сtg',
-              help='Possible options: business entertainment general health science sports technology')
+              help='Possible options: business entertainment general health science sports technology'
+              )
 @click.option('--country',
               '-с',
-              help='The 2-letter ISO 3166-1 code of the country you want to get headlines for.')
+              help='The 2-letter ISO 3166-1 code of the country you want to get headlines for.'
+              )
 @click.option('--keyword',
               '-k',
-              help='Keywords or a phrase to search for. ')
+              help='Keywords or a phrase to search for. '
+              )
 def main(pagesize, page, category, country, keyword):
     try:
         with open('apiKey.txt', 'r') as fobj:
