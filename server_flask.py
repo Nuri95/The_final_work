@@ -287,6 +287,7 @@ def get_news(id):
         user_categories = cur.fetchall()
         if user_categories:
             params['category']=user_categories[0][0] #берем первую категорию
+
         cur.execute('''
                     select k.name from keywords k 
                     join subscriptions_keywords sk on k.id = sk.keywords_id
@@ -295,6 +296,7 @@ def get_news(id):
         user_keywords = cur.fetchall()
         if user_keywords:
             params['q']=''.join([k[0] for k in user_keywords])
+
     except Exception as e:
         print(e)
         return Response({'status': 'ERROR'}, status=500)
