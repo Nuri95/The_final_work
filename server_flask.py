@@ -274,16 +274,27 @@ def remove_keywords_to_user(id):
 def get_news(id):
     # params = request.json
     # params = {key: value for key, value in params.items() if value is not None}
+    params={}
     con = None
     try:
         con, cur = get_db()
         cur.execute('''
-                        select c.name from categoris c
+                        select c.name from categories c
                         join subscriptions_category sc 
-                        on c.id = sc.keywords_id where sc.user_id = ?''',(id,)
+                        on c.id = sc.categories_id where sc.user_id = ?''',(id,)
                     )
         con.commit()
-        data = cur.fetchall()
+        user_categories = cur.fetchall()
+        if user_categories:
+            params['category']=user_categories[0][0] #берем первую категорию
+        cur.execute('''
+                    select k.name from keywords k 
+                    join subscriptions_keywords sk on k.id = sk.keywords_id
+                    where sk.user_id=?''',(id,))
+        con.commit()
+        user_keywords = cur.fetchall()
+        if user_keywords:
+            params['q']=''.join([k[0] for k in user_keywords])
     except Exception as e:
         print(e)
         return Response({'status': 'ERROR'}, status=500)
