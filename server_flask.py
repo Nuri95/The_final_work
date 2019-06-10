@@ -9,16 +9,16 @@ app = Flask(__name__)
 
 
 def get_db():
-    con = lite.connect('../../bd_users.db')
+    con = lite.connect('./bd_users.db')
     cur = con.cursor()
-    return con,cur
+    return con, cur
 
 
 def add_user(id, first_name):
     con = None
     try:
         con, cur=get_db()
-        cur.execute('''select * from users where id=(?)''',(id,))
+        cur.execute('''select * from users where id=(?)''', (id,))
         con.commit()
         data = cur.fetchall()
         if not data:
@@ -242,7 +242,6 @@ def add_keywords_to_user(id):
             con.close()
 
 
-
 @app.route('/user/<id>/keywords/remove', methods=['POST'])
 def remove_keywords_to_user(id):
     con = None
@@ -270,32 +269,36 @@ def remove_keywords_to_user(id):
         if con is not None:
             con.close()
 
+
 @app.route('/user/<id>/news', methods=['GET'])
 def get_news(id):
     # params = request.json
     # params = {key: value for key, value in params.items() if value is not None}
-    params={}
+    params = {}
     con = None
     try:
         con, cur = get_db()
         cur.execute('''
                         select c.name from categories c
                         join subscriptions_category sc 
-                        on c.id = sc.categories_id where sc.user_id = ?''',(id,)
+                        on c.id = sc.categories_id where sc.user_id = ?''', (id,)
                     )
         con.commit()
         user_categories = cur.fetchall()
+        print(user_categories)
+        list_category = [k[0] for k in user_categories]
+        print(list_category)
         if user_categories:
-            params['category']=user_categories[0][0] #берем первую категорию
+            params['category'] = user_categories[0][0]  # берем первую категорию
 
         cur.execute('''
                     select k.name from keywords k 
                     join subscriptions_keywords sk on k.id = sk.keywords_id
-                    where sk.user_id=?''',(id,))
+                    where sk.user_id=?''', (id,))
         con.commit()
         user_keywords = cur.fetchall()
         if user_keywords:
-            params['q']=''.join([k[0] for k in user_keywords])
+            params['q'] = ''.join([k[0] for k in user_keywords])
 
     except Exception as e:
         print(e)
@@ -305,38 +308,54 @@ def get_news(id):
             con.close()
 
     params['apiKey'] = 'f7c60b043dc4473d8561f5e79a1b58f9'
-    try:
-        response = requests.get('https://newsapi.org/v2/top-headlines', params=params)
+    params['country'] = 'us'
+    params['pageSize'] = 5
+    params['page'] = 1
+    dictionary_news = {}
+    for i in list_category:
+        params['category'] = i
+        try:
+            response = requests.get('https://newsapi.org/v2/top-headlines', params=params)
 
-        if response.status_code  != 200:
-            raise requests.ConnectionError(response.text)
+            if response.status_code != 200:
+                raise requests.ConnectionError(response.text)
 
-        response_json = response.json()
+            response_json = response.json()
 
-        if response_json['status']  != 'ok':
-            raise requests.ConnectionError(response.text)
+            if response_json['status'] != 'ok':
+                raise requests.ConnectionError(response.text)
 
-    except requests.ConnectionError as c:
-        print(c)
-        exit()
-    except TimeoutError as t:
-        print('The waiting time is over.')
-        exit()
-    else:
-        # for article in response.json()['articles']:
-        #     print('title: ', article['title'])
-        #     print('publishedAt: ', article['publishedAt'])
-        #     print('url: ', article['url'])
-        list = [i['title'] for i in response.json()['articles']]
-        print(list, '/n')
-        # string=''
-        # for i in range(len(list)):
-        #     string = string+'\n'+list[i]
-        # print('\n'.join(list))
-        # return jsonify(**response_json)# **-распаковывает именнованные аргументы
-        return jsonify(list)
+        except requests.ConnectionError as c:
+            print(c)
+            exit()
+        except TimeoutError as t:
+            print('The waiting time is over.')
+            exit()
+        else:
+            print(response_json)
+            # for article in response.json()['articles']:
+            #     print('title: ', article['title'])
+            #     print('publishedAt: ', article['publishedAt'])
+            #     print('url: ', article['url'])
+            list_content = [[i['title'], i['content'], i['urlToImage']] for i in response.json()['articles']]
+            print(list_content, '/n')
+            dictionary_news[i] = list_content
+            # string=''
+            # for i in range(len(list)):
+            #     string = string+'\n'+list[i]
+            # print('\n'.join(list))
+            # return jsonify(**response_json)# **-распаковывает именнованные аргументы
+            print(dictionary_news)
+            print('dddd')
+            # jsonify(response.json())
+    # return Response(json.dumps(dictionary_news),
+    #                 status=200,
+    #                 mimetype='application/json')
+    return jsonify(dictionary_news)
 
-    return 500, 'error---------------'
+    # return 500, 'error---------------'
+    # print('ffff==', dictionary_news)
+
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=8080)

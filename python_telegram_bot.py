@@ -1,34 +1,43 @@
-import pprint
 import time
 
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler, RegexHandler
-from telegram import ChatAction
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler
+
 
 import telegram
 import requests
-
+import json
 
 token = '899979051:AAFn4mmftZNrTRLWTEm-BoVd7FJcye2WTPo'
 
+REQUEST_KWARGS = {
+    'proxy_url': 'http://103.254.59.50:8080',
+    # Optional, if you need authentication:
+    # 'username': 'PROXY_USER',
+    # 'password': 'PROXY_PASS',
+}
+
+CATEGORIES_LIST, CATEGORIES_MOVE = range(2)
+KEYWORDS_LIST, KEYWORDS_MOVE = range(2)
+ACTION, ANSWER = range(2)
 
 
-def registration(bot, update):
-
+def registration(update: telegram.Update):
     # for attr, value in update.__dict__.items():
     #     if attr is not None and value is not None:
     #         print('  a=   ',attr, '     v=    ',value)
     user_id = update.message.from_user.id
     first_name = update.message.from_user.first_name
 
-    data={'id':user_id,
-          'first_name':first_name,
-          }
+    data = {'id': user_id,
+            'first_name': first_name,
+            }
 
-    add_bd = requests.post('http://127.0.0.1:8080/users',
-                                data=data )
+    response = requests.post('http://127.0.0.1:8080/users',
+                             data=data)
+    if response.status_code != 200:
+        update.message.chat_id('Bad requests')
     update.message.reply_text(
         'Hello {}'.format(update.message.from_user.first_name))
-    update.message.reply_text(menu())
 
 
 def menu(bot, update):
@@ -52,6 +61,7 @@ def menu(bot, update):
     )
     return ACTION
 
+
 def action(bot, update):
     if update.message.text == 'Categories':
         bot.send_message(chat_id=update.message.chat_id,
@@ -69,140 +79,128 @@ def answer_check(bot, update):
     return ANSWER
 
 
-def cancel(bot, update):
+def cancel(update, context):
     print('cancel')
-    # user = update.message.from_user
-    # logger.info("User %s canceled conversation",user.first_name)
     update.message.reply_text('This conversation is over')
-    print('cancel_end')
     return ConversationHandler.END
 
 
 def subscriptions(bot, update):
     print('1')
-    user_id = update.message.from_user.id
+    # user_id = update.message.from_user.id
     print('2')
     # get_user = requests.get('http://127.0.0.1:8080/subscriptions/categories', user_id)
     bot.send_message(chat_id=update.message.chat_id,
-                    parse_mode='markdown',
+                     parse_mode='markdown',
                      text='[inline mention of a user](tg://user?id=899979051)'
                      )
-                     # text='[okkk](https://vk.com)')
+    # text='[okk](https://vk.com)')
 
 
-CATEGORIES_LIST, CATEGORIES_MOVE = range(2)
-KEYWORDS_LIST, KEYWORDS_MOVE = range(2)
-def categories(bot,update):
+def categories(update, context):
     user_id = str(update.message.from_user.id)
     try:
         a = requests.get('http://127.0.0.1:8080/categories').json()
-        print(a)
-        all_categories = 'All categories:\n'+ '\n'.join([str(v[0]) + ' ' + str(v[1]) for v in a])
+        all_categories = 'All categories:\n' + '\n'.join([str(v[0]) + ' ' + str(v[1]) for v in a])
 
-        bot.send_message(chat_id=update.message.chat_id,
-                         text=all_categories)
-    except e:
+        context.bot.send_message(chat_id=update.message.chat_id,
+                                 text=all_categories)
+    except Exception as e:
         print(e)
     try:
         a = requests.get('http://127.0.0.1:8080/user/'+user_id+'/categories').json()
 
         if a:
-            subscribed_categories = 'Your categories:\n'+ '\n'.join([str(v[0]) + ' ' + str(v[1]) for v in a])
+            subscribed_categories = 'Your categories:\n' + '\n'.join([str(v[0]) + ' ' + str(v[1]) for v in a])
         else:
             subscribed_categories = 'You are not subscribed to any category'
-        bot.send_message(chat_id=update.message.chat_id,
-                         text=subscribed_categories)
-    except e:
+        context.bot.send_message(chat_id=update.message.chat_id,
+                                 text=subscribed_categories)
+    except Exception as e:
         print(e)
     return CATEGORIES_MOVE
-def move_category(bot,update):
-    print('move_CATEGORT')
+
+
+def move_category(update, context):
     text = update.message.text
-    user_id= str(update.message.from_user.id)
-    print('move_CATEGORT2')
+    user_id = str(update.message.from_user.id)
     if -1 != text.find('add'):
-        print('move_CATEGORT3')
         text = text[text.find('add')+3:].strip()
-        print('user ' + user_id + ' add category ' +text)
+        print('user ' + user_id + ' add category ' + text)
         try:
             cat_id = int(text)
-            requests.post('http://127.0.0.1:8080/user/'+user_id+'/categories/add',data={"id":cat_id})
-        except e:
+            requests.post('http://127.0.0.1:8080/user/'+user_id+'/categories/add',
+                          data={"id": cat_id})
+            context.bot.send_message(chat_id=update.message.chat_id,
+                                     text='Вы подписались на эту категорию.')
+            print('Подписались')
+        except Exception as e:
             print(e)
     elif -1 != text.find('remove'):
-        print('move_CATEGORT4')
+        print('remove 1')
         text = text[text.find('remove')+6:].strip()
         try:
-            print('move_CATEGORT5')
+            print('remove 12')
             cat_id = int(text)
-            requests.post('http://127.0.0.1:8080/user/' + user_id+'/categories/remove', data={"id": cat_id})
-        except e:
-            print('move_CATEGORT6')
+            requests.post('http://127.0.0.1:8080/user/' + user_id+'/categories/remove',
+                          data={"id": cat_id})
+            context.bot.send_message(chat_id=update.message.chat_id,
+                                     text='Вы отписались.')
+            print('Вы отписались.')
+        except Exception as e:
             print(e)
-    elif (text == 'list'):
-        print('move_CATEGORT7')
-        categories(bot,update)
-
-    print('move_CATEGORT8')
-    #elif(text == 'cancel') :
-    #    return cancel()
-    return CATEGORIES_LIST
+    if text == 'list':
+        return categories(update, context)
+    return CATEGORIES_MOVE
 
 
-def keywords(bot,update):
+def keywords(bot, update):
     user_id = str(update.message.from_user.id)
     try:
         a = requests.get('http://127.0.0.1:8080/keywords').json()
         print(a)
-        all_keywords = 'All keywords:\n'+ '\n'.join([str(v[0]) + ' ' + str(v[1]) for v in a])
+        all_keywords = 'All keywords:\n' + '\n'.join([str(v[0]) + ' ' + str(v[1]) for v in a])
 
         bot.send_message(chat_id=update.message.chat_id,
                          text=all_keywords)
-    except e:
+    except Exception as e:
         print(e)
     try:
         a = requests.get('http://127.0.0.1:8080/user/'+user_id+'/keywords').json()
 
         if a:
-            subscribed_keywords = 'Your keywords:\n'+ '\n'.join([str(v[0]) + ' ' + str(v[1]) for v in a])
+            subscribed_keywords = 'Your keywords:\n' + '\n'.join([str(v[0]) + ' ' + str(v[1]) for v in a])
         else:
             subscribed_keywords = 'You are not subscribed to any keywords'
         bot.send_message(chat_id=update.message.chat_id,
                          text=subscribed_keywords)
-    except e:
+    except Exception as e:
         print(e)
     return KEYWORDS_MOVE
 
 
-def move_keyword(bot,update):
-    print('move_KEYWORD1')
+def move_keyword(bot, update):
     text = update.message.text
-    user_id= str(update.message.from_user.id)
-    print('move_KEYWORD2')
+    user_id = str(update.message.from_user.id)
     if -1 != text.find('add'):
-        print('move_KEYWORD3')
         text = text[text.find('add')+3:].strip()
-        print('user ' + user_id + ' add keyword ' +text)
+        print('user ' + user_id + ' add keyword ' + text)
         try:
             cat_id = int(text)
-            requests.post('http://127.0.0.1:8080/user/'+user_id+'/keywords/add',data={"id":cat_id})
-        except e:
+            requests.post('http://127.0.0.1:8080/user/'+user_id+'/keywords/add', data={"id": cat_id})
+        except Exception as e:
             print(e)
     elif -1 != text.find('remove'):
-        print('move_KEYWORD4')
         text = text[text.find('remove')+6:].strip()
         try:
-            print('move_KEYWORD5')
             cat_id = int(text)
             requests.post('http://127.0.0.1:8080/user/' + user_id+'/keywords/remove', data={"id": cat_id})
-        except e:
-            print('move_KEYWORD6')
+        except Exception as e:
             print(e)
     elif text == 'list':
-        print('move_KEYWORD7')
-        categories(bot,update)
-    print('move_KEYWORD8')
-    #elif(text == 'cancel') :
+        categories(bot, update)
+
+    # elif(text == 'cancel') :
     #    return cancel()
 
     return KEYWORDS_LIST
@@ -220,15 +218,17 @@ def move_keyword(bot,update):
 #     response = requests.get('http://127.0.0.1:8080/news', json=params)
 #     update.message.reply_text('\n'.join(response.json()))
 
-def news(bot, update):
-    user_id = update.message.from_user.id
-    response = requests.get('http://127.0.0.1:8080/user/'+user_id + '/news')
-    update.message.reply_text('\n'.join(response.json()))
-def main():
-    bot = telegram.Bot(token)
-    print(bot.get_me())
-    updater = Updater(token)
+def news(update, context):
+    user_id = str(update.message.from_user.id)
+    response = requests.get('http://127.0.0.1:8080/user/' + user_id + '/news')
+    update.message.reply_text(response.json())
 
+
+def main():
+    updater = Updater(token,
+                      use_context=True,
+                      request_kwargs=REQUEST_KWARGS)
+    print(updater.bot.get_me())
     dp = updater.dispatcher  # Этот класс отправляет все виды обновления в свои зарегистрированные обработчики
 
     category_handler = ConversationHandler(
@@ -254,6 +254,7 @@ def main():
     dp.add_handler(keyword_handler)
     dp.add_handler(CommandHandler('menu', menu))
     dp.add_handler(CommandHandler('news', news))
+
     dp.add_handler(CommandHandler('subscriptions', subscriptions))
     updater.start_polling()  # Запускает опрос обновлений от Telegram.
     updater.idle()  # Программу обновления останаливает
